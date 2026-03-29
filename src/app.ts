@@ -1,29 +1,27 @@
-import express from "express";
-import bountiesRouter from "./routes/bounties";
-import paymentsRouter from "./routes/payments";
+import express from "express"
+import { bountiesRouter } from "./routes/bounties"
+import { paymentsRouter } from "./routes/payments"
+import { errorHandler, notFound } from "./middleware/errorHandler"
 
-const app = express();
+export function createApp(): express.Application {
+  const app = express()
 
-app.use(express.json());
+  // ─── Global middleware ──────────────────────────────────────────────────────
+  app.use(express.json())
+  app.use(express.urlencoded({ extended: true }))
 
-// ---------------------------------------------------------------------------
-// Health check
-// ---------------------------------------------------------------------------
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok", service: "fake-algora" });
-});
+  // ─── Health check ───────────────────────────────────────────────────────────
+  app.get("/health", (_req, res) => {
+    res.json({ status: "ok", service: "fake-algora" })
+  })
 
-// ---------------------------------------------------------------------------
-// Routes
-// ---------------------------------------------------------------------------
-app.use("/bounties", bountiesRouter);
-app.use("/payments", paymentsRouter);
+  // ─── API routes ─────────────────────────────────────────────────────────────
+  app.use("/api/bounties", bountiesRouter)
+  app.use("/api/payments", paymentsRouter)
 
-// ---------------------------------------------------------------------------
-// 404 fallthrough
-// ---------------------------------------------------------------------------
-app.use((_req, res) => {
-  res.status(404).json({ error: "Not found" });
-});
+  // ─── Error handling ─────────────────────────────────────────────────────────
+  app.use(notFound)
+  app.use(errorHandler)
 
-export default app;
+  return app
+}
