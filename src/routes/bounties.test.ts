@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
-import app from "../app";
+import { app } from "../app";
 import { store } from "../store";
 
 beforeEach(() => {
@@ -8,63 +8,63 @@ beforeEach(() => {
 });
 
 describe("GET /bounties", () => {
-  it("returns an empty list when no bounties exist", async () => {
+  it("returns a list of all bounties", async () => {
     const res = await request(app).get("/bounties");
     expect(res.status).toBe(200);
-    expect(res.body.bounties).toEqual([]);
-  });
-
-  it("returns seeded bounties when store is populated", async () => {
-    store.createBounty({
-      issue_number: 1,
-      repo: "tscircuit/fake-algora",
-      amount_usd: 10,
-      currency: "USD",
-      status: "open",
-      recipient_username: null,
-    });
-    const res = await request(app).get("/bounties");
-    expect(res.status).toBe(200);
-    expect(res.body.bounties).toHaveLength(1);
-  });
-});
-
-describe("POST /bounties", () => {
-  it("creates a bounty with valid body", async () => {
-    const res = await request(app).post("/bounties").send({
-      issue_number: 5,
-      repo: "tscircuit/core",
-      amount_usd: 25,
-    });
-    expect(res.status).toBe(201);
-    expect(res.body.bounty.amount_usd).toBe(25);
-    expect(res.body.bounty.status).toBe("open");
-  });
-
-  it("returns 400 for invalid body", async () => {
-    const res = await request(app).post("/bounties").send({});
-    expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/invalid/i);
+    expect(res.body.data).toBeInstanceOf(Array);
+    expect(res.body.data.length).toBeGreaterThan(0);
   });
 });
 
 describe("GET /bounties/:id", () => {
-  it("returns 404 for unknown id", async () => {
-    const res = await request(app).get("/bounties/nonexistent");
-    expect(res.status).toBe(404);
+  it("returns a single bounty by id", async () => {
+    const res = await request(app).get("/bounties/bounty-1");
+    expect(res.status).toBe(200);
+    expect(res.body.data.id).toBe("bounty-1");
   });
 
-  it("returns the bounty for a known id", async () => {
-    const bounty = store.createBounty({
-      issue_number: 10,
-      repo: "tscircuit/fake-algora",
-      amount_usd: 100,
+  it("returns 404 for a non-existent bounty", async () => {
+    const res = await request(app).get("/bounties/does-not-exist");
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("Bounty not found");
+  });
+});
+
+describe("POST /bounties", () => {
+  it("creates a new bounty with valid input", async () => {
+    const payload = {
+      title: "New Test Bounty",
+      description: "A bounty created in tests.",
+      amount_usd: 500,
       currency: "USD",
+    };
+
+    const res = await request(app).post("/bounties").send(payload);
+    expect(res.status).toBe(201);
+    expect(res.body.data).toMatchObject({
+      title: payload.title,
+      description: payload.description,
+      amount_usd: payload.amount_usd,
+      currency: payload.currency,
       status: "open",
-      recipient_username: null,
     });
-    const res = await request(app).get(`/bounties/${bounty.id}`);
-    expect(res.status).toBe(200);
-    expect(res.body.bounty.id).toBe(bounty.id);
+    expect(res.body.data.id).toBeDefined();
+  });
+
+  it("returns 400 when required fields are missing", async () => {
+    const res = await request(app).post("/bounties").send({ title: "Only title" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Invalid request body");
+    expect(typeof res.body.details).toBe("string");
+  });
+
+  it("returns 400 when amount_usd is not positive", async () => {
+    const res = await request(app).post("/bounties").send({
+      title: "Bad bounty",
+      description: "Negative amount",
+      amount_usd: -50,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Invalid request body");
   });
 });
