@@ -1,50 +1,40 @@
-export type PaymentStatus = "pending" | "processing" | "completed" | "failed"
-
-export interface Payment {
-  id: string
-  bounty_id: string
-  recipient_username: string
-  recipient_email?: string
-  amount_cents: number
-  currency: string
-  status: PaymentStatus
-  created_at: string
-  updated_at: string
-  metadata?: Record<string, unknown>
-}
+export type BountyStatus = "open" | "claimed" | "paid";
 
 export interface Bounty {
-  id: string
-  title: string
-  description?: string
-  amount_cents: number
-  currency: string
-  status: "open" | "claimed" | "paid" | "cancelled"
-  issue_url?: string
-  created_at: string
-  updated_at: string
-  payments: Payment[]
+  id: string;
+  title: string;
+  description: string;
+  amount_usd: number;
+  currency: string;
+  status: BountyStatus;
+  recipient_username?: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export interface SendPaymentRequest {
-  bounty_id: string
-  recipient_username: string
-  recipient_email?: string
-  amount_cents: number
-  currency?: string
-  metadata?: Record<string, unknown>
+export interface Payment {
+  id: string;
+  bounty_id: string;
+  amount_usd: number;
+  currency: string;
+  recipient_username: string;
+  created_at: string;
 }
 
-export interface ApiResponse<T> {
-  data: T
-  error?: never
+export interface ApiError {
+  error: string;
+  details?: string | Record<string, unknown>;
 }
 
-export interface ApiErrorResponse {
-  data?: never
-  error: {
-    message: string
-    code: string
-    details?: unknown
-  }
+export interface ApiSuccess<T> {
+  data: T;
+}
+
+export type CreateBountyInput = Pick<
+  Bounty,
+  "title" | "description" | "amount_usd" | "currency"
+> & { recipient_username?: string };
+
+export interface SendPaymentInput {
+  bounty_id: string;
 }
