@@ -1,139 +1,138 @@
-/**
- * In-memory store for the fake Algora server.
- * All data resets when the server restarts — perfect for testing.
- */
-import { v4 as uuidv4 } from "uuid"
-import type { Bounty, Payment, SendPaymentRequest } from "./types"
+import { randomUUID } from "crypto";
+import type { Bounty, BountyStatus, Payment } from "./types";
+
+interface CreateBountyInput {
+  title: string;
+  description: string;
+  amount_usd: number;
+  currency: string;
+  recipient_username?: string;
+}
+
+interface CreatePaymentInput {
+  bounty_id: string;
+  amount_usd: number;
+  currency: string;
+  recipient_username: string;
+}
 
 class Store {
-  private bounties: Map<string, Bounty> = new Map()
-  private payments: Map<string, Payment> = new Map()
+  private bounties: Map<string, Bounty> = new Map();
+  private payments: Map<string, Payment> = new Map();
 
-  // ─── Bounties ────────────────────────────────────────────────────────────────
+  constructor() {
+    this.seed();
+  }
 
-  createBounty(
-    data: Partial<Omit<Bounty, "id" | "created_at" | "updated_at" | "payments">>
-  ): Bounty {
-    const now = new Date().toISOString()
-    const bounty: Bounty = {
-      id: uuidv4(),
-      title: data.title ?? "Untitled Bounty",
-      description: data.description,
-      amount_cents: data.amount_cents ?? 0,
-      currency: data.currency ?? "USD",
-      status: data.status ?? "open",
-      issue_url: data.issue_url,
-      created_at: now,
-      updated_at: now,
-      payments: [],
+  private seed() {
+    const now = new Date().toISOString();
+    const seedBounties: Bounty[] = [
+      {
+        id: "bounty-seed-1",
+        title: "Fix login bug",
+        description: "The login page throws a 500 on bad credentials.",
+        amount_usd: 50,
+        currency: "USD",
+        status: "open",
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: "bounty-seed-2",
+        title: "Add dark mode",
+        description: "Implement a system-level dark mode toggle.",
+        amount_usd: 100,
+        currency: "USD",
+        status: "claimed",
+        recipient_username: "alice",
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: "bounty-seed-3",
+        title: "Write API docs",
+        description: "Document all REST endpoints with OpenAPI.",
+        amount_usd: 75,
+        currency: "USD",
+        status: "paid",
+        recipient_username: "bob",
+        created_at: now,
+        updated_at: now,
+      },
+    ];
+    for (const b of seedBounties) {
+      this.bounties.set(b.id, b);
     }
-    this.bounties.set(bounty.id, bounty)
-    return bounty
+  }
+
+  // ── Bounty helpers ─────────────────────────────────────────────────────────
+
+  listBounties(): Bounty[] {
+    return Array.from(this.bounties.values());
   }
 
   getBounty(id: string): Bounty | undefined {
-    return this.bounties.get(id)
+    return this.bounties.get(id);
   }
 
-  listBounties(): Bounty[] {
-    return Array.from(this.bounties.values())
-  }
-
-  updateBounty(id: string, patch: Partial<Bounty>): Bounty | undefined {
-    const existing = this.bounties.get(id)
-    if (!existing) return undefined
-    const updated: Bounty = {
-      ...existing,
-      ...patch,
-      id,
-      updated_at: new Date().toISOString(),
-    }
-    this.bounties.set(id, updated)
-    return updated
-  }
-
-  // ─── Payments ────────────────────────────────────────────────────────────────
-
-  createPayment(req: SendPaymentRequest): Payment {
-    const now = new Date().toISOString()
-    const payment: Payment = {
-      id: uuidv4(),
-      bounty_id: req.bounty_id,
-      recipient_username: req.recipient_username,
-      recipient_email: req.recipient_email,
-      amount_cents: req.amount_cents,
-      currency: req.currency ?? "USD",
-      status: "pending",
+  createBounty(input: CreateBountyInput): Bounty {
+    const now = new Date().toISOString();
+    const bounty: Bounty = {
+      id: randomUUID(),
+      title: input.title,
+      description: input.description,
+      amount_usd: input.amount_usd,
+      currency: input.currency,
+      status: "open",
+      recipient_username: input.recipient_username,
       created_at: now,
       updated_at: now,
-      metadata: req.metadata,
-    }
-    this.payments.set(payment.id, payment)
+    };
+    this.bounties.set(bounty.id, bounty);
+    return bounty;
+  }
 
-    // Attach to bounty
-    const bounty = this.bounties.get(req.bounty_id)
-    if (bounty) {
-      bounty.payments.push(payment)
-      bounty.updated_at = now
-    }
+  updateBountyStatus(id: string, status: BountyStatus): Bounty | undefined {
+    const bounty = this.bounties.get(id);
+    if (!bounty) return undefined;
+    const updated: Bounty = {
+      ...bounty,
+      status,
+      updated_at: new Date().toISOString(),
+    };
+    this.bounties.set(id, updated);
+    return updated;
+  }
 
-    // Simulate async processing: transition pending → processing → completed
-    this._simulatePaymentProcessing(payment.id)
+  // ── Payment helpers ────────────────────────────────────────────────────────
 
-    return payment
+  listPayments(): Payment[] {
+    return Array.from(this.payments.values());
   }
 
   getPayment(id: string): Payment | undefined {
-    return this.payments.get(id)
+    return this.payments.get(id);
   }
 
-  listPayments(bountyId?: string): Payment[] {
-    const all = Array.from(this.payments.values())
-    return bountyId ? all.filter((p) => p.bounty_id === bountyId) : all
+  createPayment(input: CreatePaymentInput): Payment {
+    const payment: Payment = {
+      id: randomUUID(),
+      bounty_id: input.bounty_id,
+      amount_usd: input.amount_usd,
+      currency: input.currency,
+      recipient_username: input.recipient_username,
+      created_at: new Date().toISOString(),
+    };
+    this.payments.set(payment.id, payment);
+    return payment;
   }
 
-  updatePaymentStatus(
-    id: string,
-    status: Payment["status"]
-  ): Payment | undefined {
-    const payment = this.payments.get(id)
-    if (!payment) return undefined
-    payment.status = status
-    payment.updated_at = new Date().toISOString()
-
-    // Mirror status update in the bounty's embedded payments array
-    const bounty = this.bounties.get(payment.bounty_id)
-    if (bounty) {
-      const idx = bounty.payments.findIndex((p) => p.id === id)
-      if (idx !== -1) bounty.payments[idx] = payment
-      if (status === "completed") {
-        bounty.status = "paid"
-        bounty.updated_at = payment.updated_at
-      }
-    }
-
-    return payment
-  }
-
-  // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-  /** Simulates the payment lifecycle: pending → processing → completed */
-  private _simulatePaymentProcessing(paymentId: string): void {
-    setTimeout(() => {
-      this.updatePaymentStatus(paymentId, "processing")
-    }, 200)
-
-    setTimeout(() => {
-      this.updatePaymentStatus(paymentId, "completed")
-    }, 600)
-  }
-
-  /** Reset all data (useful between tests) */
-  reset(): void {
-    this.bounties.clear()
-    this.payments.clear()
+  /** Reset all state — useful in tests */
+  reset() {
+    this.bounties.clear();
+    this.payments.clear();
+    this.seed();
   }
 }
 
-// Export a singleton so routes share the same in-memory state
-export const store = new Store()
+export const store = new Store();
