@@ -1,58 +1,71 @@
-/**
- * In-memory store for bounties and payments.
- * Seeded with a handful of example records for easy local testing.
- */
-
-import { v4 as uuidv4 } from "uuid";
+import { randomUUID } from "crypto";
 import type { Bounty, Payment } from "./types";
 
-const now = () => new Date().toISOString();
+type BountyStatus = Bounty["status"];
 
-// ---------------------------------------------------------------------------
-// Seed data
-// ---------------------------------------------------------------------------
-const seedBounties: Bounty[] = [
-  {
-    id: "bounty-001",
-    issue_number: 1,
-    repo: "tscircuit/fake-algora",
-    amount_usd: 10,
-    currency: "USD",
-    status: "open",
-    recipient_username: null,
-    created_at: now(),
-    updated_at: now(),
-  },
-  {
-    id: "bounty-002",
-    issue_number: 42,
-    repo: "tscircuit/core",
-    amount_usd: 50,
-    currency: "USD",
-    status: "in_progress",
-    recipient_username: "octocat",
-    created_at: now(),
-    updated_at: now(),
-  },
-];
+interface CreateBountyInput {
+  title: string;
+  description: string;
+  amount_usd: number;
+  currency: string;
+  recipient_username: string | null;
+}
 
-// ---------------------------------------------------------------------------
-// Store
-// ---------------------------------------------------------------------------
-export class Store {
+interface CreatePaymentInput {
+  bounty_id: string;
+  amount_usd: number;
+  currency: string;
+  recipient_username: string;
+}
+
+class Store {
   private bounties: Map<string, Bounty> = new Map();
   private payments: Map<string, Payment> = new Map();
 
-  constructor(seed = true) {
-    if (seed) {
-      for (const b of seedBounties) {
-        this.bounties.set(b.id, { ...b });
-      }
+  constructor() {
+    this.seed();
+  }
+
+  private seed() {
+    const now = new Date().toISOString();
+
+    const seedBounties: Bounty[] = [
+      {
+        id: "bounty-1",
+        title: "Fix login bug",
+        description: "Users cannot log in with email on Safari.",
+        amount_usd: 100,
+        currency: "USD",
+        status: "open",
+        recipient_username: null,
+        created_at: now,
+        updated_at: now,
+      },
+      {
+        id: "bounty-2",
+        title: "Add dark mode",
+        description: "Implement a dark mode toggle for the UI.",
+        amount_usd: 250,
+        currency: "USD",
+        status: "in_progress",
+        recipient_username: "alice",
+        created_at: now,
+        updated_at: now,
+      },
+    ];
+
+    for (const bounty of seedBounties) {
+      this.bounties.set(bounty.id, bounty);
     }
   }
 
-  // ------ Bounties ----------------------------------------------------------
+  reset() {
+    this.bounties.clear();
+    this.payments.clear();
+    this.seed();
+  }
 
+  // Bounty helpers
   listBounties(): Bounty[] {
     return Array.from(this.bounties.values());
   }
@@ -61,29 +74,32 @@ export class Store {
     return this.bounties.get(id);
   }
 
-  createBounty(
-    data: Omit<Bounty, "id" | "created_at" | "updated_at">
-  ): Bounty {
+  createBounty(input: CreateBountyInput): Bounty {
+    const now = new Date().toISOString();
     const bounty: Bounty = {
-      ...data,
-      id: uuidv4(),
-      created_at: now(),
-      updated_at: now(),
+      id: randomUUID(),
+      ...input,
+      status: "open",
+      created_at: now,
+      updated_at: now,
     };
     this.bounties.set(bounty.id, bounty);
     return bounty;
   }
 
-  updateBounty(id: string, patch: Partial<Bounty>): Bounty | undefined {
-    const existing = this.bounties.get(id);
-    if (!existing) return undefined;
-    const updated: Bounty = { ...existing, ...patch, updated_at: now() };
+  updateBountyStatus(id: string, status: BountyStatus): Bounty | undefined {
+    const bounty = this.bounties.get(id);
+    if (!bounty) return undefined;
+    const updated: Bounty = {
+      ...bounty,
+      status,
+      updated_at: new Date().toISOString(),
+    };
     this.bounties.set(id, updated);
     return updated;
   }
 
-  // ------ Payments ----------------------------------------------------------
-
+  // Payment helpers
   listPayments(): Payment[] {
     return Array.from(this.payments.values());
   }
@@ -92,39 +108,16 @@ export class Store {
     return this.payments.get(id);
   }
 
-  getPaymentsByBounty(bountyId: string): Payment[] {
-    return Array.from(this.payments.values()).filter(
-      (p) => p.bounty_id === bountyId
-    );
-  }
-
-  createPayment(
-    data: Omit<Payment, "id" | "created_at" | "updated_at">
-  ): Payment {
+  createPayment(input: CreatePaymentInput): Payment {
     const payment: Payment = {
-      ...data,
-      id: uuidv4(),
-      created_at: now(),
-      updated_at: now(),
+      id: randomUUID(),
+      ...input,
+      status: "completed",
+      created_at: new Date().toISOString(),
     };
     this.payments.set(payment.id, payment);
     return payment;
   }
-
-  updatePayment(id: string, patch: Partial<Payment>): Payment | undefined {
-    const existing = this.payments.get(id);
-    if (!existing) return undefined;
-    const updated: Payment = { ...existing, ...patch, updated_at: now() };
-    this.payments.set(id, updated);
-    return updated;
-  }
-
-  /** Reset to empty (useful in tests) */
-  reset() {
-    this.bounties.clear();
-    this.payments.clear();
-  }
 }
 
-/** Singleton store used by the server */
 export const store = new Store();
