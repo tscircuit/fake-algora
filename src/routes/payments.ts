@@ -1,103 +1,78 @@
-import { Router, type Request, type Response, type NextFunction } from "express"
-import { z } from "zod"
-import { store } from "../store"
-import { createError } from "../middleware/errorHandler"
-import type { ApiResponse } from "../types"
+import { Router } from "express";
+import { z } from "zod";
+import { store } from "../store";
 
-export const paymentsRouter = Router()
+export const paymentsRouter = Router();
 
-// ─── Validation schemas ───────────────────────────────────────────────────────
+/** GET /payments — list all payments */
+paymentsRouter.get("/", (_req, res) => {
+  res.json({ data: store.listPayments() });
+});
+
+/** GET /payments/:id — get a single payment */
+paymentsRouter.get("/:id", (req, res) => {
+  const payment = store.getPayment(req.params.id);
+  if (!payment) {
+    return res.status(404).json({ error: "Payment not found" });
+  }
+  return res.json({ data: payment });
+});
 
 const SendPaymentSchema = z.object({
-  bounty_id: z.string().min(1, "bounty_id is required"),
-  recipient_username: z.string().min(1, "recipient_username is required"),
-  recipient_email: z.string().email().optional(),
-  amount_cents: z
-    .number()
-    .int("amount_cents must be an integer")
-    .positive("amount_cents must be positive"),
-  currency: z.string().default("USD"),
-  metadata: z.record(z.unknown()).optional(),
-})
-
-// ─── POST /payments — Send a payment ─────────────────────────────────────────
+  bounty_id: z.string().min(1),
+});
 
 /**
- * Send a payment for a bounty.
+ * POST /payments/send
  *
- * Body:
- *   bounty_id          string   — ID of the bounty being paid
- *   recipient_username string   — Algora username of the recipient
- *   recipient_email    string?  — Optional email for the recipient
- *   amount_cents       number   — Amount in cents (e.g. 1000 = $10.00)
- *   currency           string?  — ISO currency code, default "USD"
- *   metadata           object?  — Arbitrary key/value metadata
+ * Sends a payment for the given bounty. All payment fields
+ * (amount_usd, currency, recipient_username) are derived from the
+ * bounty record to prevent inconsistent data.
+ *
+ * Rules:
+ *  - The bounty must exist.
+ *  - The bounty must have a recipient_username assigned.
+ *  - The bounty must not already be paid (idempotency guard).
+ *  - On success the bounty status is updated to "paid".
  */
-paymentsRouter.post(
-  "/",
-  (req: Request, res: Response, next: NextFunction): void => {
-    const parsed = SendPaymentSchema.safeParse(req.body)
-    if (!parsed.success) {
-      return next(
-        createError(
-          parsed.error.errors.map((e) => e.message).join("; "),
-          422,
-          "VALIDATION_ERROR"
-        )
-      )
-    }
-
-    const bounty = store.getBounty(parsed.data.bounty_id)
-    if (!bounty) {
-      return next(
-        createError(
-          `Bounty '${parsed.data.bounty_id}' not found`,
-          404,
-          "BOUNTY_NOT_FOUND"
-        )
-      )
-    }
-
-    if (bounty.status === "paid") {
-      return next(
-        createError(
-          `Bounty '${parsed.data.bounty_id}' has already been paid`,
-          409,
-          "BOUNTY_ALREADY_PAID"
-        )
-      )
-    }
-
-    const payment = store.createPayment(parsed.data)
-    const body: ApiResponse<typeof payment> = { data: payment }
-    res.status(201).json(body)
+paymentsRouter.post("/send", (req, res) => {
+  const result = SendPaymentSchema.safeParse(req.body);
+  if (!result.success) {
+    return res.status(400).json({
+      error: "Invalid request body",
+      details: result.error.format(),
+    });
   }
-)
 
-// ─── GET /payments — List all payments (optionally filtered by bounty) ────────
+  const { bounty_id } = result.data;
 
-paymentsRouter.get(
-  "/",
-  (_req: Request, res: Response): void => {
-    const bountyId = _req.query.bounty_id as string | undefined
-    const payments = store.listPayments(bountyId)
-    const body: ApiResponse<typeof payments> = { data: payments }
-    res.json(body)
+  const bounty = store.getBounty(bounty_id);
+  if (!bounty) {
+    return res.status(404).json({ error: "Bounty not found" });
   }
-)
 
-// ─── GET /payments/:id — Get a single payment ─────────────────────────────────
-
-paymentsRouter.get(
-  "/:id",
-  (req: Request, res: Response, next: NextFunction): void => {
-    const payment = store.getPayment(req.params.id)
-    if (!payment) {
-      return next(
-        createError(`Payment '${req.params.id}' not found`, 404, "NOT_FOUND")
-      )
-    }
-    const body: ApiResponse<typeof payment> = { data: payment }
-    res.json(body)
+  if (!bounty.recipient_username) {
+    return res
+      .status(422)
+      .json({ error: "Bounty has no recipient assigned; cannot send payment" });
   }
-)
+
+  if (bounty.status === "paid") {
+    return res
+      .status(409)
+      .json({ error: "Payment already sent for this bounty" });
+  }
+
+  // Derive all monetary / recipient fields directly from the bounty
+  const payment = store.createPayment({
+    bounty_id,
+    amount_usd: bounty.amount_usd,
+    currency: bounty.currency,
+    recipient_username: bounty.recipient_username,
+  });
+
+  // Mark the bounty as paid
+  store.updateBountyStatus(bounty_id, "paid");
+
+  return res.status(201).json({ data: payment });
+});
