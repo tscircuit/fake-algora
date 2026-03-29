@@ -1,87 +1,73 @@
 import { Router } from "express";
 import { z } from "zod";
-import { v4 as uuidv4 } from "uuid";
 import { store } from "../store";
 
-const router = Router();
+export const paymentsRouter = Router();
 
-// ---------------------------------------------------------------------------
-// Schema
-// ---------------------------------------------------------------------------
 const SendPaymentSchema = z.object({
-  bounty_id: z.string().min(1, "bounty_id is required"),
-  recipient_username: z.string().min(1, "recipient_username is required"),
-  amount_usd: z.number().positive("amount_usd must be positive"),
-  currency: z.string().default("USD"),
+  bounty_id: z.string().min(1),
 });
 
-// ---------------------------------------------------------------------------
-// GET /payments — list all payments
-// ---------------------------------------------------------------------------
-router.get("/", (_req, res) => {
-  res.json({ payments: store.listPayments() });
+// GET /payments
+paymentsRouter.get("/", (_req, res) => {
+  const payments = store.listPayments();
+  res.json({ data: payments });
 });
 
-// ---------------------------------------------------------------------------
-// GET /payments/:id — get a single payment
-// ---------------------------------------------------------------------------
-router.get("/:id", (req, res) => {
+// GET /payments/:id
+paymentsRouter.get("/:id", (req, res) => {
   const payment = store.getPayment(req.params.id);
   if (!payment) {
     return res.status(404).json({ error: "Payment not found" });
   }
-  res.json({ payment });
+  res.json({ data: payment });
 });
 
-// ---------------------------------------------------------------------------
-// POST /payments/send — send a payment for a bounty
-// ---------------------------------------------------------------------------
-router.post("/send", (req, res) => {
+// POST /payments/send
+paymentsRouter.post("/send", (req, res) => {
   const result = SendPaymentSchema.safeParse(req.body);
   if (!result.success) {
     return res
       .status(400)
-      .json({ error: "Invalid request body", details: result.error.format() });
+      .json({ error: "Invalid request body", details: result.error.message });
   }
 
-  const { bounty_id, recipient_username, amount_usd, currency } = result.data;
+  const { bounty_id } = result.data;
 
-  // Validate the bounty exists
+  // Verify bounty exists
   const bounty = store.getBounty(bounty_id);
   if (!bounty) {
+    return res.status(404).json({ error: "Bounty not found" });
+  }
+
+  // Prevent paying a bounty that has no assigned recipient
+  if (!bounty.recipient_username) {
     return res
-      .status(404)
-      .json({ error: "Bounty not found", details: `No bounty with id "${bounty_id}"` });
+      .status(400)
+      .json({ error: "Bounty has no recipient assigned; cannot send payment" });
   }
 
-  // Guard: don't allow double-payment
+  // Guard against double payment
   if (bounty.status === "paid") {
-    return res.status(409).json({
-      error: "Bounty already paid",
-      details: `Bounty "${bounty_id}" has already been marked as paid`,
-    });
+    return res
+      .status(409)
+      .json({ error: "Bounty has already been paid", bounty_id });
   }
 
-  // Create payment record (simulate async processing → immediately complete)
+  if (bounty.status === "cancelled") {
+    return res.status(400).json({ error: "Cannot pay a cancelled bounty" });
+  }
+
+  // Derive payment fields from the bounty to avoid inconsistent records
   const payment = store.createPayment({
     bounty_id,
-    recipient_username,
-    amount_usd,
-    currency,
-    status: "completed",
-    transaction_id: `txn_${uuidv4().replace(/-/g, "").slice(0, 16)}`,
+    amount_usd: bounty.amount_usd,
+    currency: bounty.currency,
+    recipient_username: bounty.recipient_username,
   });
 
-  // Update bounty status
-  store.updateBounty(bounty_id, {
-    status: "paid",
-    recipient_username,
-  });
+  // Mark bounty as paid
+  store.updateBountyStatus(bounty_id, "paid");
 
-  res.status(201).json({
-    payment,
-    message: `Payment of $${amount_usd} ${currency} sent to @${recipient_username} for bounty ${bounty_id}`,
-  });
+  res.status(201).json({ data: payment });
 });
-
-export default router;
