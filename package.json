@@ -1,12 +1,12 @@
 {
   "name": "fake-algora",
-  "version": "0.1.0",
-  "description": "A fake/mock Algora API server for testing bounty payment flows",
+  "version": "1.0.0",
+  "description": "A fake/mock Algora API server for testing bounty integrations",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
