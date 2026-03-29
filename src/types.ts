@@ -1,30 +1,50 @@
-export interface Bounty {
-  id: string;
-  title: string;
-  description: string;
-  amount_usd: number;
-  currency: string;
-  status: "open" | "in_progress" | "paid" | "cancelled";
-  recipient_username: string | null;
-  created_at: string;
-  updated_at: string;
-}
+export type PaymentStatus = "pending" | "processing" | "completed" | "failed"
 
 export interface Payment {
-  id: string;
-  bounty_id: string;
-  amount_usd: number;
-  currency: string;
-  recipient_username: string;
-  status: "pending" | "completed" | "failed";
-  created_at: string;
+  id: string
+  bounty_id: string
+  recipient_username: string
+  recipient_email?: string
+  amount_cents: number
+  currency: string
+  status: PaymentStatus
+  created_at: string
+  updated_at: string
+  metadata?: Record<string, unknown>
 }
 
-export interface ApiSuccess<T> {
-  data: T;
+export interface Bounty {
+  id: string
+  title: string
+  description?: string
+  amount_cents: number
+  currency: string
+  status: "open" | "claimed" | "paid" | "cancelled"
+  issue_url?: string
+  created_at: string
+  updated_at: string
+  payments: Payment[]
 }
 
-export interface ApiError {
-  error: string;
-  details?: string;
+export interface SendPaymentRequest {
+  bounty_id: string
+  recipient_username: string
+  recipient_email?: string
+  amount_cents: number
+  currency?: string
+  metadata?: Record<string, unknown>
+}
+
+export interface ApiResponse<T> {
+  data: T
+  error?: never
+}
+
+export interface ApiErrorResponse {
+  data?: never
+  error: {
+    message: string
+    code: string
+    details?: unknown
+  }
 }
