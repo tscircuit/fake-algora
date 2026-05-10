@@ -9,8 +9,24 @@ export const thingSchema = z.object({
 })
 export type Thing = z.infer<typeof thingSchema>
 
+export const paymentSchema = z.object({
+  payment_id: z.string(),
+  recipient: z.string(),
+  amount_usd: z.number().positive(),
+  currency: z.string(),
+  status: z.enum(["sent"]),
+  bounty_id: z.string().optional(),
+  issue_url: z.string().url().optional(),
+  memo: z.string().optional(),
+  idempotency_key: z.string().optional(),
+  transfer_reference: z.string(),
+  created_at: z.string(),
+})
+export type Payment = z.infer<typeof paymentSchema>
+
 export const databaseSchema = z.object({
   idCounter: z.number().default(0),
   things: z.array(thingSchema).default([]),
+  payments: z.array(paymentSchema).default([]),
 })
 export type DatabaseSchema = z.infer<typeof databaseSchema>
