@@ -83,3 +83,19 @@ test("cancel a pending fake payment", async () => {
 
   expect(cancelResponse.data.payment.status).toBe("cancelled")
 })
+
+test("fail a pending fake payment", async () => {
+  const { axios } = await getTestServer()
+
+  await axios.post("/payments/send", {
+    recipient: "octocat",
+    amount: 15,
+    currency: "USD",
+  })
+
+  const failResponse = await axios.post("/payments/fail", {
+    payment_id: "payment_0",
+  })
+
+  expect(failResponse.data.payment.status).toBe("failed")
+})

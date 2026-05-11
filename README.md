@@ -49,11 +49,12 @@ Supported filters are `recipient`, `repository`, and `status`.
 GET /payments/get?payment_id=payment_0
 ```
 
-### Complete or cancel a payment
+### Complete, cancel, or fail a payment
 
 ```http
 POST /payments/complete
 POST /payments/cancel
+POST /payments/fail
 Content-Type: application/json
 ```
 
