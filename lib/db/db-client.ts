@@ -1,9 +1,15 @@
-import { createStore, type StoreApi } from "zustand/vanilla"
+import { type HoistedStoreApi, hoist } from "zustand-hoist"
 import { immer } from "zustand/middleware/immer"
-import { hoist, type HoistedStoreApi } from "zustand-hoist"
+import { type StoreApi, createStore } from "zustand/vanilla"
 
-import { databaseSchema, type DatabaseSchema, type Thing } from "./schema.ts"
 import { combine } from "zustand/middleware"
+import {
+  type DatabaseSchema,
+  type Payment,
+  type PaymentStatus,
+  type Thing,
+  databaseSchema,
+} from "./schema.ts"
 
 export const createDatabase = () => {
   return hoist(createStore(initializer))
@@ -20,5 +26,46 @@ const initializer = combine(databaseSchema.parse({}), (set) => ({
       ],
       idCounter: state.idCounter + 1,
     }))
+  },
+  createPayment: (
+    payment: Omit<
+      Payment,
+      "payment_id" | "status" | "created_at" | "updated_at"
+    >,
+  ) => {
+    let createdPayment: Payment
+    set((state) => {
+      const now = new Date().toISOString()
+      createdPayment = {
+        ...payment,
+        payment_id: `payment_${state.idCounter}`,
+        status: "pending",
+        created_at: now,
+        updated_at: now,
+      }
+      return {
+        payments: [...state.payments, createdPayment],
+        idCounter: state.idCounter + 1,
+      }
+    })
+    return createdPayment!
+  },
+  updatePaymentStatus: (paymentId: string, status: PaymentStatus) => {
+    let updatedPayment: Payment | undefined
+    set((state) => {
+      const now = new Date().toISOString()
+      return {
+        payments: state.payments.map((payment) => {
+          if (payment.payment_id !== paymentId) return payment
+          updatedPayment = {
+            ...payment,
+            status,
+            updated_at: now,
+          }
+          return updatedPayment
+        }),
+      }
+    })
+    return updatedPayment
   },
 }))
