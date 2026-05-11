@@ -9,7 +9,12 @@ export const thingSchema = z.object({
 })
 export type Thing = z.infer<typeof thingSchema>
 
-export const paymentStatusSchema = z.enum(["pending", "completed", "failed"])
+export const paymentStatusSchema = z.enum([
+  "pending",
+  "completed",
+  "canceled",
+  "failed",
+])
 export type PaymentStatus = z.infer<typeof paymentStatusSchema>
 
 export const paymentSchema = z.object({
@@ -18,13 +23,19 @@ export const paymentSchema = z.object({
   amount: z.number(),
   currency: z.string(),
   status: paymentStatusSchema,
+  owner: z.string().optional(),
+  repo: z.string().optional(),
   bounty_id: z.string().optional(),
   issue_number: z.number().optional(),
   repository: z.string().optional(),
   idempotency_key: z.string().optional(),
+  cancel_reason: z.string().optional(),
+  failure_reason: z.string().optional(),
   created_at: z.string(),
   updated_at: z.string(),
   completed_at: z.string().optional(),
+  canceled_at: z.string().optional(),
+  failed_at: z.string().optional(),
 })
 export type Payment = z.infer<typeof paymentSchema>
 

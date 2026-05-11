@@ -5,12 +5,12 @@ import { z } from "zod"
 export default withRouteSpec({
   methods: ["GET"],
   jsonResponse: z.object({
-    payment: paymentSchema.optional(),
+    payment: paymentSchema.nullable(),
   }),
 })((req, ctx) => {
   const url = new URL(req.url)
   const paymentId = url.searchParams.get("payment_id")
-  const payment = ctx.db.payments.find((item) => item.payment_id === paymentId)
+  const payment = paymentId ? ctx.db.getPayment(paymentId) : undefined
 
-  return ctx.json({ payment })
+  return ctx.json({ payment: payment ?? null })
 })
