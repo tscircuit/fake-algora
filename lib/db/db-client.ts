@@ -1,9 +1,14 @@
-import { createStore, type StoreApi } from "zustand/vanilla"
+import { type HoistedStoreApi, hoist } from "zustand-hoist"
 import { immer } from "zustand/middleware/immer"
-import { hoist, type HoistedStoreApi } from "zustand-hoist"
+import { type StoreApi, createStore } from "zustand/vanilla"
 
-import { databaseSchema, type DatabaseSchema, type Thing } from "./schema.ts"
 import { combine } from "zustand/middleware"
+import {
+  type Payment,
+  type PaymentStatus,
+  type Thing,
+  databaseSchema,
+} from "./schema.ts"
 
 export const createDatabase = () => {
   return hoist(createStore(initializer))
@@ -20,5 +25,65 @@ const initializer = combine(databaseSchema.parse({}), (set) => ({
       ],
       idCounter: state.idCounter + 1,
     }))
+  },
+  addPayment: (
+    payment: Omit<
+      Payment,
+      | "payment_id"
+      | "status"
+      | "created_at"
+      | "updated_at"
+      | "completed_at"
+      | "cancelled_at"
+    >,
+  ) => {
+    let createdPayment: Payment | undefined
+
+    set((state) => {
+      const now = new Date().toISOString()
+      createdPayment = {
+        ...payment,
+        payment_id: state.paymentIdCounter.toString(),
+        status: "pending",
+        created_at: now,
+        updated_at: now,
+      }
+
+      return {
+        payments: [...state.payments, createdPayment],
+        paymentIdCounter: state.paymentIdCounter + 1,
+      }
+    })
+
+    if (!createdPayment) {
+      throw new Error("Payment was not created")
+    }
+
+    return createdPayment
+  },
+  updatePaymentStatus: (payment_id: string, status: PaymentStatus) => {
+    let updatedPayment: Payment | undefined
+
+    set((state) => {
+      const now = new Date().toISOString()
+
+      return {
+        payments: state.payments.map((payment) => {
+          if (payment.payment_id !== payment_id) return payment
+
+          updatedPayment = {
+            ...payment,
+            status,
+            updated_at: now,
+            ...(status === "completed" ? { completed_at: now } : {}),
+            ...(status === "cancelled" ? { cancelled_at: now } : {}),
+          }
+
+          return updatedPayment
+        }),
+      }
+    })
+
+    return updatedPayment
   },
 }))
