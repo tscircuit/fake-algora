@@ -1,5 +1,8 @@
 import { expect, test } from "bun:test"
+import { join } from "node:path"
+import { Request as EdgeRuntimeRequest } from "@edge-runtime/primitives"
 import { getTestServer } from "tests/fixtures/get-test-server"
+import { createWinterSpecBundleFromDir } from "winterspec/adapters/node"
 
 test("sends and completes a fake payment", async () => {
   const { axios } = await getTestServer()
@@ -67,4 +70,37 @@ test("filters listed payments", async () => {
 
   expect(data.payments).toHaveLength(1)
   expect(data.payments[0].recipient).toBe("first@example.com")
+})
+
+test("shares payment records when no db middleware is injected", async () => {
+  const winterspecBundle = await createWinterSpecBundleFromDir(
+    join(import.meta.dir, "../../../routes"),
+  )
+  const idempotencyKey = `production-path-${Math.random().toString(36).slice(2)}`
+
+  const sendResponse = await winterspecBundle.makeRequest(
+    new EdgeRuntimeRequest("http://localhost/payments/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        recipient: "production@example.com",
+        amount: 25,
+        idempotency_key: idempotencyKey,
+      }),
+    }) as any,
+  )
+  const sendData = await sendResponse.json()
+
+  const completeResponse = await winterspecBundle.makeRequest(
+    new EdgeRuntimeRequest("http://localhost/payments/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        payment_id: sendData.payment.payment_id,
+      }),
+    }) as any,
+  )
+  const completeData = await completeResponse.json()
+
+  expect(completeData.payment.status).toBe("completed")
 })
