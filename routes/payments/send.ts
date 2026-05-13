@@ -16,7 +16,10 @@ export default withRouteSpec({
   }),
 })(async (req, ctx) => {
   const paymentRequest = await req.json()
-  const payment = ctx.db.sendPayment(paymentRequest)
+  const payment = ctx.db.sendPayment({
+    ...paymentRequest,
+    currency: paymentRequest.currency ?? "USD",
+  })
 
   return ctx.json({ payment })
 })

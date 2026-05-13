@@ -45,6 +45,17 @@ test("deduplicates payments by idempotency key", async () => {
   expect(listResponse.data.payments).toHaveLength(1)
 })
 
+test("defaults payment currency to USD", async () => {
+  const { axios } = await getTestServer()
+
+  const { data } = await axios.post("/payments/send", {
+    recipient: "github:user",
+    amount_cents: 500,
+  })
+
+  expect(data.payment.currency).toBe("USD")
+})
+
 test("get a payment by id", async () => {
   const { axios } = await getTestServer()
 
