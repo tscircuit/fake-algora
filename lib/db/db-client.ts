@@ -21,4 +21,9 @@ const initializer = combine(databaseSchema.parse({}), (set) => ({
       idCounter: state.idCounter + 1,
     }))
   },
+  removeThing: (thing_id: string) => {
+    set((state) => ({
+      things: state.things.filter((t) => t.thing_id !== thing_id),
+    }))
+  },
 }))
