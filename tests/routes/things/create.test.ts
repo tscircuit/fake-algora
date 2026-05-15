@@ -4,7 +4,7 @@ import { test, expect } from "bun:test"
 test("create a thing", async () => {
   const { axios } = await getTestServer()
 
-  axios.post("/things/create", {
+  await axios.post("/things/create", {
     name: "Thing1",
     description: "Thing1 Description",
   })
