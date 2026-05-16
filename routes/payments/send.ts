@@ -9,6 +9,39 @@ const sendPaymentBodySchema = z.object({
   bounty_issue: z.string().optional(),
   metadata: z.record(z.string(), z.string()).optional(),
 })
+type SendPaymentBody = z.infer<typeof sendPaymentBodySchema>
+
+const hasSameIdempotentPayload = (
+  existingPayment: {
+    recipient: string
+    amount: number
+    currency: string
+    bounty_issue?: string
+    metadata: Record<string, string>
+  },
+  incomingPayment: SendPaymentBody,
+) => {
+  if (existingPayment.recipient !== incomingPayment.recipient) return false
+  if (existingPayment.amount !== incomingPayment.amount) return false
+  if (existingPayment.currency !== incomingPayment.currency) return false
+  if (existingPayment.bounty_issue !== incomingPayment.bounty_issue)
+    return false
+
+  const existingMetadata = existingPayment.metadata
+  const incomingMetadata = incomingPayment.metadata ?? {}
+
+  if (
+    Object.keys(existingMetadata).length !==
+    Object.keys(incomingMetadata).length
+  )
+    return false
+
+  for (const [key, value] of Object.entries(incomingMetadata)) {
+    if (existingMetadata[key] !== value) return false
+  }
+
+  return true
+}
 
 export default withRouteSpec({
   methods: ["POST"],
@@ -28,6 +61,7 @@ export default withRouteSpec({
       updated_at: z.string(),
     }),
     idempotent_replay: z.boolean().optional(),
+    error: z.string().optional(),
   }),
 })(async (req, ctx) => {
   const body = sendPaymentBodySchema.parse(await req.json())
@@ -35,6 +69,14 @@ export default withRouteSpec({
   if (body.idempotency_key) {
     const existing = ctx.db.findPaymentByIdempotencyKey(body.idempotency_key)
     if (existing) {
+      if (!hasSameIdempotentPayload(existing, body)) {
+        return ctx.json({
+          ok: false,
+          payment: existing,
+          error: "idempotency_key_reused_with_different_payload",
+        })
+      }
+
       return ctx.json({
         ok: true,
         payment: existing,

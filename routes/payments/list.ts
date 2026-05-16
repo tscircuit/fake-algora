@@ -36,6 +36,12 @@ export default withRouteSpec({
     ? paymentStatusSchema.safeParse(statusParam)
     : null
 
+  if (statusParam && !parsedStatus?.success) {
+    return ctx.json({
+      payments: [],
+    })
+  }
+
   const payments = ctx.db.getState().payments.filter((payment) => {
     if (recipient && payment.recipient !== recipient) return false
     if (bountyIssue && payment.bounty_issue !== bountyIssue) return false

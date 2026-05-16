@@ -26,6 +26,18 @@ test("payment lifecycle routes work and support idempotent send", async () => {
     firstSend.data.payment.payment_id,
   )
 
+  const conflictingReplay = await axios.post("/payments/send", {
+    ...sendBody,
+    amount: 31,
+  })
+  expect(conflictingReplay.data.ok).toBe(false)
+  expect(conflictingReplay.data.error).toBe(
+    "idempotency_key_reused_with_different_payload",
+  )
+  expect(conflictingReplay.data.payment.payment_id).toBe(
+    firstSend.data.payment.payment_id,
+  )
+
   const paymentId = firstSend.data.payment.payment_id
 
   const listRes = await axios.get("/payments/list")
@@ -61,6 +73,11 @@ test("payment lifecycle routes work and support idempotent send", async () => {
     params: { status: "completed" },
   })
   expect(listCompleted.data.payments).toHaveLength(1)
+
+  const listInvalidStatus = await axios.get("/payments/list", {
+    params: { status: "complete" },
+  })
+  expect(listInvalidStatus.data.payments).toHaveLength(0)
 
   const cancelRes = await axios.post("/payments/cancel", {
     payment_id: paymentId,
