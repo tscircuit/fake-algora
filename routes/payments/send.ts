@@ -5,7 +5,7 @@ const sendPaymentBodySchema = z.object({
   recipient: z.string().min(1),
   amount: z.number().positive(),
   currency: z.string().default("USD"),
-  idempotency_key: z.string().optional(),
+  idempotency_key: z.string().trim().min(1).optional(),
   bounty_issue: z.string().optional(),
   metadata: z.record(z.string(), z.string()).optional(),
 })

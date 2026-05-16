@@ -69,3 +69,29 @@ test("payment lifecycle routes work and support idempotent send", async () => {
   expect(cancelRes.data.error).toBe("invalid_status_transition")
   expect(cancelRes.data.payment.status).toBe("completed")
 })
+
+test("send rejects blank idempotency key", async () => {
+  const { axios } = await getTestServer()
+
+  let error: unknown = null
+  try {
+    await axios.post("/payments/send", {
+      recipient: "dev@example.com",
+      amount: 30,
+      currency: "USD",
+      idempotency_key: "   ",
+    })
+  } catch (caught) {
+    error = caught
+  }
+
+  expect(error).not.toBeNull()
+  const maybeError = error as {
+    status?: number
+    response?: { status?: number }
+  }
+  expect(maybeError.status ?? maybeError.response?.status).toBe(400)
+
+  const listRes = await axios.get("/payments/list")
+  expect(listRes.data.payments).toHaveLength(0)
+})
