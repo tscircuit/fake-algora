@@ -37,6 +37,14 @@ export default withRouteSpec({
     })
   }
 
+  if (payment.status !== "pending") {
+    return ctx.json({
+      ok: false,
+      payment,
+      error: "invalid_status_transition",
+    })
+  }
+
   ctx.db.updatePaymentStatus(payment_id, "canceled")
 
   return ctx.json({
