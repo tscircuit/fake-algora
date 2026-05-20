@@ -33,6 +33,11 @@ export const paymentListResponseSchema = z.object({
   payments: z.array(paymentSchema),
 })
 
+export const paymentListRouteResponseSchema = z.union([
+  paymentListResponseSchema,
+  errorResponseSchema,
+])
+
 export const getPaymentRequestSchema = z.object({
   payment_id: z.string().min(1),
 })

@@ -33,6 +33,17 @@ test("send, list, get, and complete a fake payment", async () => {
   )
   expect(listResponse.data.payments).toHaveLength(1)
 
+  const invalidStatusResponse = await axios.get(
+    "/payments/list?status=complete",
+    {
+      validateStatus: () => true,
+    },
+  )
+  expect(invalidStatusResponse.status).toBe(400)
+  expect(invalidStatusResponse.data.error.status).toContain(
+    "Invalid payment status",
+  )
+
   const getResponse = await axios.get("/payments/get?payment_id=0")
   expect(getResponse.data.payment.recipient_email).toBe("solver@example.com")
 
