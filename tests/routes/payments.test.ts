@@ -101,3 +101,29 @@ test("does not mutate terminal fake payment states", async () => {
 
   expect(completeData.payment.status).toBe("canceled")
 })
+
+test("marks pending fake payments as failed", async () => {
+  const { axios } = await getTestServer()
+
+  const { data: sendData } = await axios.post("/payments/send", {
+    recipient: "erin",
+    amount: 45,
+    repository: "tscircuit/fake-algora",
+  })
+
+  const { data: failData } = await axios.post("/payments/fail", {
+    payment_id: sendData.payment.payment_id,
+  })
+
+  expect(failData.payment.status).toBe("failed")
+
+  const { data: listData } = await axios.get("/payments/list", {
+    params: {
+      repository: "tscircuit/fake-algora",
+      status: "failed",
+    },
+  })
+
+  expect(listData.payments).toHaveLength(1)
+  expect(listData.payments[0].payment_id).toBe(sendData.payment.payment_id)
+})

@@ -14,6 +14,7 @@ The fake payment routes are intentionally in-memory and safe for local testing:
 - `GET /payments/get?payment_id=...` returns one payment.
 - `POST /payments/complete` marks a pending payment as completed.
 - `POST /payments/cancel` marks a pending payment as canceled.
+- `POST /payments/fail` marks a pending payment as failed.
 
 `POST /payments/send` also supports an optional `idempotency_key` so retrying the
 same fake payment request does not create duplicate records.

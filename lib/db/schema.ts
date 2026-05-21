@@ -9,7 +9,12 @@ export const thingSchema = z.object({
 })
 export type Thing = z.infer<typeof thingSchema>
 
-export const paymentStatusSchema = z.enum(["pending", "completed", "canceled"])
+export const paymentStatusSchema = z.enum([
+  "pending",
+  "completed",
+  "canceled",
+  "failed",
+])
 export type PaymentStatus = z.infer<typeof paymentStatusSchema>
 
 export const paymentSchema = z.object({
