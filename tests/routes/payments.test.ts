@@ -42,6 +42,10 @@ test("idempotency key replays the original fake payment", async () => {
   })
   const { data: replayedSend } = await axios.post("/payments/send", {
     ...paymentRequest,
+    idempotency_key: "send-once",
+  })
+  const { data: distinctSend } = await axios.post("/payments/send", {
+    ...paymentRequest,
     amount: 25,
     idempotency_key: "send-once",
   })
@@ -50,9 +54,12 @@ test("idempotency key replays the original fake payment", async () => {
   expect(replayedSend.replayed).toBe(true)
   expect(replayedSend.payment.payment_id).toBe(firstSend.payment.payment_id)
   expect(replayedSend.payment.amount).toBe(10)
+  expect(distinctSend.replayed).toBe(false)
+  expect(distinctSend.payment.payment_id).not.toBe(firstSend.payment.payment_id)
+  expect(distinctSend.payment.amount).toBe(25)
 
   const { data: listData } = await axios.get("/payments/list")
-  expect(listData.payments).toHaveLength(1)
+  expect(listData.payments).toHaveLength(2)
 })
 
 test("get and complete a fake payment", async () => {
@@ -99,6 +106,11 @@ test("list filters payments and prevents changing terminal payments", async () =
   expect(completedPayments.payments[0].payment_id).toBe(
     firstSend.payment.payment_id,
   )
+
+  const { data: emptyRecipientPayments } = await axios.get(
+    "/payments/list?recipient=",
+  )
+  expect(emptyRecipientPayments.payments).toHaveLength(0)
 
   const cancelResponse = await fetch(`${url}/payments/cancel`, {
     method: "POST",

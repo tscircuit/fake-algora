@@ -36,6 +36,21 @@ type PaymentFilters = {
 
 const now = () => new Date().toISOString()
 
+const hasMatchingIdempotencyScope = (
+  payment: Payment,
+  paymentInput: CreatePaymentInput,
+) => {
+  return (
+    payment.idempotency_key === paymentInput.idempotency_key &&
+    payment.recipient === paymentInput.recipient &&
+    payment.amount === paymentInput.amount &&
+    payment.currency === paymentInput.currency &&
+    payment.repository === paymentInput.repository &&
+    payment.issue_number === paymentInput.issue_number &&
+    payment.bounty_id === paymentInput.bounty_id
+  )
+}
+
 const initializer = combine(databaseSchema.parse({}), (set, get) => ({
   addThing: (thing: Omit<Thing, "thing_id">) => {
     set((state) => ({
@@ -50,8 +65,8 @@ const initializer = combine(databaseSchema.parse({}), (set, get) => ({
     paymentInput: CreatePaymentInput,
   ): { payment: Payment; replayed: boolean } => {
     if (paymentInput.idempotency_key) {
-      const replayedPayment = get().payments.find(
-        (payment) => payment.idempotency_key === paymentInput.idempotency_key,
+      const replayedPayment = get().payments.find((payment) =>
+        hasMatchingIdempotencyScope(payment, paymentInput),
       )
       if (replayedPayment) {
         return { payment: replayedPayment, replayed: true }
@@ -76,10 +91,16 @@ const initializer = combine(databaseSchema.parse({}), (set, get) => ({
   },
   listPayments: (filters: PaymentFilters = {}) => {
     return get().payments.filter((payment) => {
-      if (filters.recipient && payment.recipient !== filters.recipient) {
+      if (
+        filters.recipient !== undefined &&
+        payment.recipient !== filters.recipient
+      ) {
         return false
       }
-      if (filters.repository && payment.repository !== filters.repository) {
+      if (
+        filters.repository !== undefined &&
+        payment.repository !== filters.repository
+      ) {
         return false
       }
       if (
@@ -88,7 +109,7 @@ const initializer = combine(databaseSchema.parse({}), (set, get) => ({
       ) {
         return false
       }
-      if (filters.status && payment.status !== filters.status) {
+      if (filters.status !== undefined && payment.status !== filters.status) {
         return false
       }
       return true
